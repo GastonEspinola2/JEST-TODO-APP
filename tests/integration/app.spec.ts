@@ -1,8 +1,17 @@
-
 import request from 'supertest';
 import app from '../../src/app';
 
 describe('Todo API', () => {
+  const clearTodos = async () => {
+    const list = await request(app).get('/todos');
+    const todos = Array.isArray(list.body) ? list.body : [];
+    await Promise.all(todos.map((t: any) => request(app).delete(`/todos/${t.id}`)));
+  };
+
+  beforeEach(async () => {
+    await clearTodos();
+  });
+
   // Test de salud: verifica que el servidor responda correctamente
   it('GET /health -> 200', async () => {
     const res = await request(app).get('/health');
@@ -10,15 +19,15 @@ describe('Todo API', () => {
     expect(res.body).toEqual({ ok: true });
   });
 
-  // Test: creación de un TODO mediante HTTP POST
+  // Test: creacion de un TODO mediante HTTP POST
   it('POST /todos crea un todo', async () => {
     const res = await request(app).post('/todos').send({ title: 'Probar API' });
-    expect(res.status).toBe(201); // código HTTP correcto
+    expect(res.status).toBe(201); // codigo HTTP correcto
     expect(res.body).toHaveProperty('id'); // devuelve un id
     expect(res.body.title).toBe('Probar API');
   });
 
-  // Flujo completo: crear → listar → toggle → borrar
+  // Flujo completo: crear -> listar -> toggle -> borrar
   it('flujo: crear -> listar -> toggle -> borrar', async () => {
     // 1) Crear
     const create = await request(app).post('/todos').send({ title: 'Flujo' });
@@ -37,15 +46,28 @@ describe('Todo API', () => {
     const del = await request(app).delete(`/todos/${id}`);
     expect(del.status).toBe(204);
 
-    // 5) Verificar que ya no está
+    // 5) Verificar que ya no esta
     const list2 = await request(app).get('/todos');
     expect(list2.body.some((t: any) => t.id === id)).toBe(false);
   });
 
-  // Caso de error: título inválido
-  it('POST /todos con título inválido -> 400', async () => {
+  // Caso de error: titulo invalido
+  it('POST /todos con titulo invalido -> 400', async () => {
     const res = await request(app).post('/todos').send({ title: 'a' });
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty('error');
+  });
+
+  it('GET /todos/stats devuelve los totales', async () => {
+    await request(app).post('/todos').send({ title: 'AA' });
+    const b = await request(app).post('/todos').send({ title: 'BB' });
+    await request(app).post('/todos').send({ title: 'CC' });
+
+    await request(app).patch(`/todos/${b.body.id}/toggle`);
+
+    const res = await request(app).get('/todos/stats');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ total: 3, completed: 1, pending: 2 });
   });
 });

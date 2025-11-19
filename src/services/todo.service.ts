@@ -23,6 +23,13 @@ export class TodoService {
     return todo;
   }
 
+  stats(): { total: number; completed: number; pending: number } {
+    const total = this.todos.length;
+    const completed = this.todos.filter(t => t.completed).length;
+    const pending = total - completed;
+    return { total, completed, pending };
+  }
+
   toggle(id: TodoId): Todo {
     const t = this.todos.find(x => x.id === id);
     if (!t) throw new Error('Todo not found');
